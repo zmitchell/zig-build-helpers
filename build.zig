@@ -34,7 +34,7 @@ pub fn addCheckStep(b: *Build, name: []const u8, description: []const u8, exe_mo
 // Pass modules and files as:
 // - &[_]*Module { ... }
 // - &[_][]const u8 { "foo", "bar", ... }
-fn addTestStep(b: *Build, target: ResolvedTarget, optimize: OptimizeMode, modules: []const *Module, files: []const []const u8) void {
+pub fn addTestStep(b: *Build, target: ResolvedTarget, optimize: OptimizeMode, modules: []const *Module, files: []const []const u8) void {
     const test_step = b.step("test", "Run all tests");
     const test_filters = b.option([]const []const u8, "test-filter", "Skip all tests that don't match a filter") orelse &[0][]const u8{};
 
