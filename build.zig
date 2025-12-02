@@ -2,6 +2,8 @@ const std = @import("std");
 const Build = std.Build;
 const Step = Build.Step;
 const Module = Build.Module;
+const ResolvedTarget = Build.ResolvedTarget;
+const OptimizeMode = std.builtin.OptimizeMode;
 
 pub fn build(_: *Build) void {}
 
@@ -27,4 +29,34 @@ pub fn addCheckStep(b: *Build, name: []const u8, description: []const u8, exe_mo
     // Skip the installation step
     var check_step = b.step("check", description);
     check_step.dependOn(&check_exe.step);
+}
+
+// Pass modules and files as:
+// - &[_]*Module { ... }
+// - &[_][]const u8 { "foo", "bar", ... }
+fn addTestStep(b: *Build, target: ResolvedTarget, optimize: OptimizeMode, modules: []const *Module, files: []const []const u8) void {
+    const test_step = b.step("test", "Run all tests");
+    const test_filters = b.option([]const []const u8, "test-filter", "Skip all tests that don't match a filter") orelse &[0][]const u8{};
+
+    for (modules) |mod| {
+        const artifact = b.addTest(.{
+            .root_module = mod,
+            .filters = test_filters,
+        });
+        const run = b.addRunArtifact(artifact);
+        test_step.dependOn(&run.step);
+    }
+
+    for (files) |src_file| {
+        const artifact = b.addTest(.{
+            .root_module = b.createModule(.{
+                .root_source_file = b.path(src_file),
+                .target = target,
+                .optimize = optimize,
+            }),
+            .filters = test_filters,
+        });
+        const run = b.addRunArtifact(artifact);
+        test_step.dependOn(&run.step);
+    }
 }
