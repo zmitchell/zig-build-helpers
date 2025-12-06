@@ -34,29 +34,66 @@ pub fn addCheckStep(b: *Build, name: []const u8, description: []const u8, exe_mo
 // Pass modules and files as:
 // - &[_]*Module { ... }
 // - &[_][]const u8 { "foo", "bar", ... }
-pub fn addTestStep(b: *Build, target: ResolvedTarget, optimize: OptimizeMode, modules: []const *Module, files: []const []const u8) void {
+pub fn addTestStep(b: *Build, target: ResolvedTarget, optimize: OptimizeMode, modules: anytype, files: []const []const u8) void {
     const test_step = b.step("test", "Run all tests");
     const test_filters = b.option([]const []const u8, "test-filter", "Skip all tests that don't match a filter") orelse &[0][]const u8{};
 
-    for (modules) |mod| {
-        const artifact = b.addTest(.{
-            .root_module = mod,
-            .filters = test_filters,
-        });
-        const run = b.addRunArtifact(artifact);
-        test_step.dependOn(&run.step);
+    const modules_type = @TypeOf(modules);
+    const modules_typeinfo = @typeInfo(modules_type);
+    if (modules_typeinfo == .@"struct") {
+        inline for (modules_typeinfo.@"struct".fields) |field| {
+            const artifact = b.addTest(.{
+                .name = field.name,
+                .root_module = @field(modules, field.name),
+                .filters = test_filters,
+            });
+            const run = b.addRunArtifact(artifact);
+            test_step.dependOn(&run.step);
+        }
+    } else if (modules_typeinfo == .pointer) {
+        inline for (modules) |mod| {
+            const artifact = b.addTest(.{
+                .root_module = mod,
+                .filters = test_filters,
+            });
+            const run = b.addRunArtifact(artifact);
+            test_step.dependOn(&run.step);
+        }
+    } else {
+        @compileError("addTestStep only accepts slices or structs for the modules argument");
     }
 
-    for (files) |src_file| {
-        const artifact = b.addTest(.{
-            .root_module = b.createModule(.{
-                .root_source_file = b.path(src_file),
-                .target = target,
-                .optimize = optimize,
-            }),
-            .filters = test_filters,
-        });
-        const run = b.addRunArtifact(artifact);
-        test_step.dependOn(&run.step);
+    const files_type = @TypeOf(files);
+    const files_typeinfo = @typeInfo(files_type);
+    if (files_typeinfo == .@"struct") {
+        inline for (files_typeinfo.@"struct".fields) |field| {
+            const artifact = b.addTest(.{
+                .name = field.name,
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path(@field(files, field.name)),
+                    .target = target,
+                    .optimize = optimize,
+                }),
+                .filters = test_filters,
+            });
+            const run = b.addRunArtifact(artifact);
+            test_step.dependOn(&run.step);
+        }
+    } else if (files_typeinfo == .pointer and files_typeinfo.pointer.size == .slice) {
+        inline for (files) |src_file| {
+            const artifact = b.addTest(.{
+                .name = src_file,
+                .root_module = b.createModule(.{
+                    .root_source_file = b.path(src_file),
+                    .target = target,
+                    .optimize = optimize,
+                }),
+                .filters = test_filters,
+            });
+            const run = b.addRunArtifact(artifact);
+            test_step.dependOn(&run.step);
+        }
+    } else {
+        @compileError("addTestStep only accepts slices or structs for the files argument");
     }
 }
