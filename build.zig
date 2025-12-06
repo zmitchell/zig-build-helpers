@@ -76,7 +76,7 @@ pub fn addTestStep(b: *Build, target: ResolvedTarget, optimize: OptimizeMode, mo
             const run = b.addRunArtifact(artifact);
             test_step.dependOn(&run.step);
         }
-    } else if (files_typeinfo == .pointer and files_typeinfo.pointer.size == .slice) {
+    } else if (files_typeinfo == .pointer) {
         inline for (files) |src_file| {
             const artifact = b.addTest(.{
                 .name = src_file,
